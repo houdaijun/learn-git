@@ -1,0 +1,1 @@
+kernel /driver /video /sprdfb/lcd  添加驱动代码

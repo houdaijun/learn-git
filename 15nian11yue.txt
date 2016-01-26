@@ -1,0 +1,164 @@
+11月10日   星期二
+       阅读 mian/u-boot/drivers/video/sprdfd/lcd/lcd_hx8379c_mipi.c文档，
+	   其中有些不懂的名词，现查找如下解释：
+	hfp:水平前沿 单位为一个vclk的时间
+	hbp: 水平后沿
+	hsync: 行同步信号
+	vfp: 垂直前沿
+	vbp:  垂直后沿
+	vsync: 帧同步信号
+
+	work_mode: 工作模式
+	video_bus_width:  数据宽度
+	lan_number: mipi总线中数据线的个数
+	phy_feq: mipi线上的时钟
+	h_sync_pol: 行同步 极性  高低电平
+	v_sync_pol:  帧同步 极性
+	de_pol:  数据位极性
+	te_pol:反馈信号 极性（LCD 反馈给CPU，一帧完成）
+	color_mode_pol: 颜色模式的极性
+	shut_down_pol: 关闭向下 极性
+	timing:  时间
+	ops:
+
+	width:  宽
+	height:  高
+	fps:  帧率,刷新频率
+	type: 样式 类型
+	direction: 方向
+	info: 信息
+	ops:
+11月11日 星期三
+sprdfb_probe函数：（作用：获取液晶信息）
+	set_backlight 设置背光
+	#ifdef CONFIG_MACH_CORI
+	LDO_SetVoltLevel(LDO_LDO_SIM3, LDO_VOLT_LEVEL1);   设置  电压
+	LDO_TurnOnLDO(LDO_LDO_SIM3);   打开 
+	LDO_SetVoltLevel(LDO_LDO_VDD28, LDO_VOLT_LEVEL3);
+	LDO_TurnOnLDO(LDO_LDO_VDD28);
+	#endif
+	#ifdef CONFIG_GARDA
+	LDO_SetVoltLevel(LDO_LDO_SIM1, LDO_VOLT_LEVEL2);
+	LDO_TurnOnLDO(LDO_LDO_SIM1);
+	dev->ctrl = &sprdfb_dispc_ctrl;设置结构提 初始化
+	dev->ctrl->early_init(dev);初始化接口
+	if (0 != sprdfb_panel_probe(dev)) {
+			sprdfb_panel_probe  获取相关信息
+				panel = adapt_panel_from_readid(dev);  适应性读取ID
+					for一下为for循环内语句
+					ret = panel_mount(dev, panel_cfg[i].panel);判断LCD总线模式，填充dev->if_ctrl结构提 填充dev->panel结构提
+					dev->ctrl->update_clk(dev);
+					panel_init(dev);面板初始化
+					if(b_panel_reset==0)
+					{
+						panel_reset(dev);复位
+						b_panel_reset=1;
+					}
+					panel_ready(dev);
+					id = dev->panel->ops->panel_readid(dev->panel);
+					if(id == panel_cfg[i].lcd_id)
+						save_lcd_id_to_kernel(id);保存ID，将ID保存到一个变量，Normal_mode.c会调用函数来读取ID，将其添加到一个BUFF中，uboot将此BUFF传给内核，
+						panel_ready(dev);  读取信息
+						return panel_cfg[i].panel; 退出循环，返回液晶屏的相关参数（lcd_hx8379c_mipi.c内的struct panel_spec lcd_hx8379c_mipi_spec结构体）
+					else
+						sprdfb_panel_remove(dev);
+	获取信息失败执行一下代码
+		sprdfb_panel_remove(dev);清除struct panel_spec	*panel内容
+			
+		dev->ctrl->uninit(dev);调用结构体内的 函数，uninit
+		printf("sprdfb: failed to probe\n");
+		return -EFAULT;
+	}
+LCD_ID传递给内核：
+	在u-boot/drivers/video/sprdfb/sprdfb_main.c文件内有load_lcd_id_to_kernel函数，选中函数名，按下ctrl + / 键，查找调用这个函数的地方，选着Normal_mode.c文件，即可找到调用处，发现是cmdline_fixup_lcd函数调用的，这个函数读取LCD_ID到BUFF内，并传给内核。
+	在kernel/drivers/video/sprdfb/Sprdfb_panel.c文件内，__setup("lcd_id=", lcd_id_get);函数获取u-boot传递过来的参数，lcd_id_get函数会处理LCD_ID，将字符串转化为数字。
+
+对比阅读u-boot与kernel下的lcd_hx8379c_mipi.c文档，将其不同之处列出：
+	kernel内头文件与u_boot不同
+	kernel文件内hx8379c_readid函数返回值为0x8379（固定），u_boot内成功返回0x8379失败返回0
+	kernel内多了如下结构提：	
+		static LCM_Force_Cmd_Code rd_prep_code_1[]={
+		{0x37, {LCM_SEND(2), {0x1, 0}}},
+		};
+	kernel内多了hx8379c_readpowermode函数  返回液晶屏的电源模式
+	kernel内多了hx8379c_check_esd函数  防静电函数，会调用hx8379c_readpowermode函数
+	kernel内static struct panel_operations lcd_hx8379c_mipi_operations结构提多了.panel_esd_check = hx8379c_check_esd,项
+	kernel内多了struct panel_cfg lcd_hx8379c_mipi结构体
+	kernel内多了__init lcd_hx8379c_mipi_init函数  此函数会调用kernel/drivers/video/sprdfb/Sprdfb_panel.c内的sprdfb_panel_register函数（注册），将设备添加到链表中。
+	kernel内多了subsys_initcall函数  子系统初始化函数，会调用lcd_hx8379c_mipi_init函数
+
+查看reset引脚的控制流程
+	在kernel/drivers/video/sprdfb/Sprdfb_panel.c文件中：
+sprdfb_panel_resume 函数内
+	//step1 reset pin to high
+	if (dev->panel->ops->panel_before_resume != NULL) {
+		//himax mipi lcd may define empty function  有复位函数就执行
+		dev->panel->ops->panel_before_resume(dev->panel);
+	}
+	else{
+		panel_before_resume(dev);复位函数
+			/*restore the reset pin status*/  回复引脚状态
+			sprd_panel_set_rstn_prop(0);
+				sci_glb_write(CTL_PIN_BASE + panel_rstpin_map[i].reg,  panel_rstpin_map[i].val, 0xffffffff);  写寄存器
+					sci_glb_write(u32 reg, u32 val, u32 msk)					
+					unsigned long flags;
+					__arch_default_lock(HWLOCK_GLB, &flags);  不大理解 应该为获得锁
+					__raw_writel((__raw_readl(reg) & ~msk) | val, reg);  对寄存器进行读写操作
+					__arch_default_unlock(HWLOCK_GLB, &flags);
+			/*restore  the reset pin to high*/ 复位引脚为高
+			panel_set_resetpin(dev->dev_id, 1, dev->panel);
+				panel_set_resetpin(uint16_t dev_id,  uint32_t status, struct panel_spec *panel )
+				/*panel set reset pin status*/ 设置引脚状态
+				if(SPRDFB_MAINLCD_ID == dev_id){
+					panel_set_resetpin_dispc(status);
+						dispc_write(0/1, DISPC_RSTN);
+							sci_glb_write((g_dispc_base_addr + reg), value, 0xffffffff);对寄存器进行操作
+				}else{
+					panel_set_resetpin_lcdc(status);
+			return 0;
+
+	if(from_deep_sleep){
+		//step2 turn on mipi
+		panel_init(dev);
+
+		//step3 reset panel
+		panel_reset(dev);
+
+		//step4 panel init
+		dev->panel->ops->panel_init(dev->panel);
+
+		//step5 clk/data lane enter HS
+		panel_ready(dev);
+	}else{
+		//step2 turn on mipi
+		/*Jessica TODO: resume i2c, spi, mipi*/
+		if(NULL != dev->panel->if_ctrl->panel_if_resume){
+			dev->panel->if_ctrl->panel_if_resume(dev);
+		}
+
+		//step3 sleep out
+		if(NULL != dev->panel->ops->panel_enter_sleep){
+			dev->panel->ops->panel_enter_sleep(dev->panel,0);
+		}
+
+		//step4 clk/data lane enter HS
+		panel_ready(dev);
+	}	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

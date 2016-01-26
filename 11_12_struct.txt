@@ -1,0 +1,20 @@
+static struct rda_lcd_info ST7796_mcu_info = {
+	.ops = {
+		.s_init_gpio = ST7796_mcu_init_gpio,
+		.s_open = ST7796_mcu_open,
+		.s_readid = ST7796_mcu_readid,
+		.s_active_win = ST7796_mcu_set_active_win,
+		.s_rotation = ST7796_mcu_set_rotation,
+		.s_sleep = ST7796_mcu_sleep,
+		.s_wakeup = ST7796_mcu_wakeup,
+		.s_close = ST7796_mcu_close,
+		.s_read_fb = ST7796_mcu_read_fb,
+		.s_rda_lcd_dbg_w = ST7796_rda_lcd_dbg_w},
+	.lcd = {
+		.width = ST7796_MCU_LCDD_DISP_X,
+		.height = ST7796_MCU_LCDD_DISP_Y,
+		.lcd_interface = GOUDA_LCD_IF_DBI,
+		.lcd_timing = ST7796_MCU_TIMING,
+		.lcd_cfg = ST7796_MCU_CONFIG},
+	.name = ST7796_MCU_PANEL_NAME,
+};

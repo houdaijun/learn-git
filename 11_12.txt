@@ -1,0 +1,37 @@
+11月12日
+	kernel/drivers/video/rda/ rda_panel_st7796_mcu.c 
+入口函数 rda_fb_panel_ST7796_mcu_init
+	rda_fb_probe_panel(&ST7796_mcu_info, &rda_fb_panel_ST7796_mcu_driver);
+	执行rda_fb_panel_ST7796_mcu_driver结构体的probe函数
+	执行rda_fb_register_panel(&ST7796_mcu_info);
+	填充platform_device 结构体匹配项，有几个设备
+	.dev = {
+		.dma_mask = &rda_fb_dmamask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	 	}
+	#define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1)) 执行（1《《32 ）-1
+dma_mask与coherent_dma_mask这两个参数表示它能寻址的物理地址的范围，内核通过这两个参数分配合适的物理内存给 device。其中dma_coherent_mask则作用于申请一致性DMA缓冲区。因为不是所有的硬件都能够支持64bit的地址宽度，如果 addr_phy 是一个物理地址，且 (u64)addr_phy <= *dev->dma_mask，那么 该 device 就可以寻址该物理地址。如果 device 只能寻址32位地址，那么 mask 应为 0xffffffff。
+
+DMA动态映射
+大多是64位平台有一些特殊硬件可以将总线地址（DMA地址）转换为物理地址。这个和CPU如何利用页表或TLB将虚拟地址转换成物理地址有点像。DMA API可以在任何总线上工作，和体系结构无关。
+默认情况下，内核假设设备可以在32位地址空间寻址。对于64位设备，设备的寻址空间将大大增加。对于一个有寻址限制的外设，如前面所讨论的，需要减小寻址空间。
+
+可以通过调用dma_set_mask()来通知内核相关限制：
+int dma_set_mask(struct device *dev, u64 mask);
+
+通过调用dma_set_coherent_mask()通知内核一致性内存分配的限制。
+int dma_set_coherent_mask(struct device *dev, u64 mask);
+
+
+cd private
+git pull
+gitk
+cd ..
+cp ./private/a6b/5271/* . -av
+source build/envsetup.sh
+lunch
+make -j4
+
+
+
+

@@ -1,0 +1,113 @@
+根据msg2133的数据手册		
+msg2133有电容式触摸传感器接口(capacitive touch sensor interface)  //芯片的始能  
+主机接口(host interface)	中断
+GPIO接口和电源引脚		供电
+
+Msg2133接口的初始化
+	static void rda_msg2133_init(struct i2c_client *client)
+{
+	rda_tsl1680_check_chip_ver(client);
+	rda_msg2133_init_chip(client);
+	rda_msg2133_check_mem_data(client);
+}
+
+rda_msg2133_init_chip(client); 芯片的复位，引脚的复位。
+ 
+IIC地址
+
+虚拟按键
+if (virKeyCode == 1) {
+				//menu key
+					pos_data->ts_position[0].x = 120 * 2048/480;
+					pos_data->ts_position[0].y = 854 * 2048/800;
+				} else if (virKeyCode == 2) {
+					//home key
+					pos_data->ts_position[0].x = 200 * 2048/480;
+					pos_data->ts_position[0].y = 854 * 2048/800;
+				} else {
+					//back key
+					pos_data->ts_position[0].x = 280 * 2048/480;
+					pos_data->ts_position[0].y = 854 * 2048/800;
+		     }
+
+ts_para = {
+		.name = "msg2133",
+		.i2c_addr = _DEF_I2C_ADDR_TS_MSG2133,
+		.x_max = MSG2133_RES_X,
+		.y_max = MSG2133_RES_Y,
+		.gpio_irq = GPIO_TOUCH_IRQ,
+		.vir_key_num = 3,
+		.irqTriggerMode = IRQF_TRIGGER_FALLING,
+	}
+学习怎么看时序图，怎么通过时序图编写程序，怎么去控制MCU的寄存器和对IO的操作。
+
+--------------------------------------------------------------------------
+rda_ts_msg2133.c
+rda_msg2133_init     
+static void rda_msg2133_init_chip(struct i2c_client *client)
+{
+	rda_msg2133_reset_chip(client);		//清零并设置
+	rda_msg2133_load_fw(client);
+	rda_msg2133_startup_chip(client);
+	rda_msg2133_reset_chip(client);
+	rda_msg2133_reset_gpio();
+	rda_msg2133_reset_chip(client);
+	rda_msg2133_startup_chip(client);
+}
+static void rda_msg2133_reset_gpio(void)
+{
+	gpio_set_value(GPIO_TOUCH_RESET, 1);     //1 端口的设置
+	mdelay(5);		// Delay 5 ms
+	gpio_set_value(GPIO_TOUCH_RESET, 0);	 //0  端口的清零
+	mdelay(80);		// Delay 80 ms
+	gpio_set_value(GPIO_TOUCH_RESET, 1);
+	mdelay(100);
+}
+__gpio_set_value和gpio_set_value的区别
+一般带__这种操作的宏和函数是未保护的，__gpio_set_vallue是没有地址范围检测的，如果引用非法地址，有可能内核down掉
+
+这些调用使用gpio_* 命名前缀。没有别的调用会使用这个前缀或是相关的__gpio_*前缀
+
+GPIO
+使用GPIO，系统首先要分配一个GPIO，使用gpio_request() 为系统分配一个GPIO。
+static void rda_msg2133_init_gpio(void)
+{
+	gpio_request(GPIO_TOUCH_RESET, "touch screen reset");		TP复位
+	gpio_request(GPIO_TOUCH_IRQ, "touch screen interrupt");		TP中断
+
+	gpio_direction_output(GPIO_TOUCH_RESET, 0);
+	mdelay(1);		// Delay 10ms
+	gpio_direction_input(GPIO_TOUCH_IRQ);
+	mdelay(1);
+
+	rda_msg2133_reset_gpio();
+}
+标示GPIO的方向，通常在使用GPIO建立一个platform_device时（位于单板的setup代码中）：
+ /* set as input or output, returning 0 or negative errno */
+ int gpio_direction_input(unsigned gpio);
+ int gpio_direction_output(unsigned gpio, int value);
+
+
+	i2c_transfer(client->adapter, &msg, 1);
+2c_transfer()函数本身不具备驱动适配器物理硬件完成消息交互的能力，它只是寻找到i2c_adapter对应的i2c_algorithm，并使用i2c_algorithm的master_xfer()函数真正驱动硬件流程。
+struct i2c_algorithm {
+ /* If an adapter algorithm can't do I2C-level access, set master_xfer
+    to NULL. If an adapter algorithm can do SMBus access, set
+    smbus_xfer. If set to NULL, the SMBus protocol is simulated
+    using common I2C messages */
+ /* master_xfer should return the number of messages successfully
+    processed, or a negative value on error */
+ int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,   //i2c传输函数指针，在amlogic芯片中是在drivers/amlogic/i2c/aml_i2c.c中定义
+      int num);                   //master_xfer提供的是i2c_transfer实现部分。更多的I2C adapter工作于I2C总线主机模式。
+int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
+      unsigned short flags, char read_write,       //smbus传输函数指针
+      u8 command, int size, union i2c_smbus_data *data);   // smbus_xfer提供i2c_smbus_xfer的实现部分。只有I2C adapter工作于SMBus模式，需要提供。
+
+ /* To determine what the adapter supports */
+ u32 (*functionality) (struct i2c_adapter *);     //返回适配器支持的功能
+};
+
+__________________________________________________________________________
+rda_ts_base.c
+__init rda_ts_init
+

@@ -1,0 +1,90 @@
+amera模块,从上层到底层一共包含着这么几个部分:
+
+    1、apk------java语言
+
+    2、camera的java接口----java语言
+
+    3、camera的java接口的具体实现,即所谓的JNI-----(java—>C++)
+
+    4、camera客户端-----C++语言
+
+    5、camera服务器----C++语言
+
+    6、camera硬件抽象层,即所谓的HAL------C++语言
+
+    7、camera驱动
+
+V4L2 sensor的图像帧率,频率,输出格式等等.DMA对齐,图像闪动,色彩不对之类什么乱七八糟。
+1 上层首先调用framework层的Camera.java(frameworks\base\core\java\android\hardware)
+	 Camera(int cameraId) {
+		        native_setup(new WeakReference<Camera>(this), cameraId);    //此处camera的初始化
+
+    }
+	take picture 方法
+2 调用到JNI层的android_hardware_Camera.cpp(frameworks\base\core\jni)
+	frameworks/base/core/jni/android_hardware_Camera.cpp中具体实现了这个函数
+{ "native_setup",
+
+    "(Ljava/lang/Object;I)V",
+
+    (void*)android_hardware_Camera_native_setup },
+  android_hardware_Camera_takePicture方法，其中会通过get_native_camera获取一个Camera对象。
+
+3 JNI调用了camera客户端
+client:frameworks/av/camera/Camera.cpp		//Camera对象的真正实现    自动对焦 照片的设置
+
+service:frameworks/av/services/camera/libcameraservice/CameraService.cpp
+
+位置：android_hardware_Camera.cpp(frameworks\base\core\jni)
+static void android_hardware_Camera_native_setup(JNIEnv *env, jobject thiz,
+    jobject weak_this, jint cameraId, jstring clientPackageName)
+{
+    // Convert jstring to String16
+    const char16_t *rawClientName = env->GetStringChars(clientPackageName, NULL);
+    jsize rawClientNameLen = env->GetStringLength(clientPackageName);
+    String16 clientName(rawClientName, rawClientNameLen);
+    env->ReleaseStringChars(clientPackageName, rawClientName);
+
+    sp<Camera> camera = Camera::connect(cameraId, clientName,		
+            Camera::USE_CALLING_UID);			////调用的是frameworks/av/camera/Camera.cpp
+	。。。。。。。。。
+}
+
+从client 调到service  通过  connect
+sevice	通过initialize调到frameworks/base/services/camera/libcameraservice/CameraHardwareInterface.h初始化camera
+
+
+Service Manager在Binder机制中既充当守护进程的角色，同时它也充当着Server角色，然而它又与一般的Server不一样。对于普通的Server来说，Client如果想要获得Server的远程接口，那么必须通过Service Manager远程接口提供的getService接口来获得，这本身就是一个使用Binder机制来进行进程间通信的过程。而对于Service Manager这个Server来说，Client如果想要获得Service Manager远程接口，却不必通过进程间通信机制来获得，因为Service Manager远程接口是一个特殊的Binder引用，它的引用句柄一定是0。
+
+这是网上直接搜来的。不是太通俗,而且牵扯到binder通信。下面说说我的理解。
+
+现在正值春运,就拿乘坐火车回家来说吧。client(客户端)其实就相当于我们每个人,我们都想回家,都想买到理想中的火车票(最好是卧铺).但是火车的运力是一定的.不可能每个人都买到回家的票.如果没人管,那坐火车就变成谁的块头大谁能上车了.铁道部(今年刚改革了)就是这个管理者(service),我买了今天的A火车B车厢C座.其他人要是还想坐这个座位,对不起,应经被占用了.
+
+android.一个android手机中有可能有好几个照相机应用.每一个应用实现一个client.如果A应用从service申请到了camera,并且在后台录像.这时候B也要打开照相机,那service就会直接回复说,不好意思,设备正使用中(BUZY)
+
+4 在CameraService的onFirstRef方法中，会加载CameraHal  Module
+void CameraService:: onFirstRef()
+{
+    BnCameraService::onFirstRef();
+ 
+    if (hw_get_module(CAMERA_HARDWARE_MODULE_ID,
+                (const hw_module_t**)&mModule) < 0) {
+        ALOGE("Could not load camera HALmodule");
+        mNumberOfCameras = 0;
+    }
+hw_get_module()这个函数,获取hardware
+hw_get_module方法的实现在hardware/libhardware/Hardware.c文件中实现
+Hw_module_t的定义在hardware.h文件中，hw_module_t持有对hw_module_methods_t引用，其中有定义一个open指针
+typedef structhw_module_methods_t {
+    /** Open a specific device */
+    int (*open)(const struct hw_module_t*module, const char* id,
+            struct hw_device_t** device);
+5 CameraHAL.cpp(hardware\libware\modules\camera)
+	hardware中一定要有这个叫HAL_MODULE_INFO_SYM的结构体
+	open
+	ops
+6 驱动 rda_camera_base.c(kernel/drivers/rda)
+
+
+v4l   hardware/rda/rda8810/libcamera
+	

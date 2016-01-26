@@ -1,0 +1,95 @@
+像素图像传感器 sp0a19
+图像传感器 bf3703
+		 摄像头调试
+代码：a6b-5271
+位置：device/rda/driver/camera/inc/sp0a19_config.h   前置摄像头
+struct sensor_dev sp0a19_dev = {
+	.info	= &sp0a19_info,		//定义camera信息
+	.ops	= &sp0a19_ops,		//定义camera函数接口
+};
+---------------------------------------------------------------------
+sp019_info
+static struct sensor_info bf3703_info = {	//sernsor 
+	.name		= "sp0a19",		//名字		显示
+	.chip_id	= 0xa6,			//chip id
+	.mclk		= 26,			//系统时钟
+	.i2c_addr	= 0x21,			//i2c地址
+	.exp_def	= 0,			//亮度级别
+	.awb_def	= 1,			//白平衡
+	.rst_act_h	= false,		//低电平复位
+	.pdn_act_h	= true,			//高电平掉电
+	.init		= &sp0a19_init,		//参数的设置
+	.win_cfg	= &sp0a19_win_cfg,	//分辨率 
+	.csi_cfg	= &sp0a19_csi_cfg	//....
+};
+static struct sensor_reg_list sp0a19_init = {
+	.size = ARRAY_ROW(init_sp0a19),
+	.val = init_sp0a19
+};
+需要修改的地方
+static struct sensor_reg init_sp0a19[] {
+	//[Sensor]
+	{0xfd,0x00,BIT,0},
+	{0x1C,0x28,BIT,0},//00
+	{0x32,0x00,BIT,0},
+	{0x0f,0x2f,BIT,0},//3f//p1
+	
+	传感器的设置
+	暗电平的设置
+	室内参数设置
+	ae target
+	灰度检测   
+	。。。。。。。。。。。。。
+					}
+struct sensor_reg {
+	u16 addr; //for 8bits regs addr, only use the low 8bits
+	u8 data;
+	u8 bits;
+	u32 wait;
+};
+	
+------------------------------------------------------------------------------------------
+sp0a19_ops
+static struct sensor_ops sp0a19_ops = {
+	.power		= sp0a19_power,			上电
+	.get_chipid	= sp0a19_get_chipid,		id
+	.get_lum	= sp0a19_get_lum,		打开闪光灯
+	.set_flip	= sp0a19_set_flip,		镜像
+	.set_exp	= sp0a19_set_exp,		默认亮度
+	.set_awb	= sp0a19_set_awb,		白屏横
+	.sensor_test = sp0a19_sensor_test,		测试
+	.start		= NULL,	
+	.stop		= NULL
+};
+sp0a19_power		设置关机状态  电的序列
+sp0a19_get_chipid	chip id
+。。。。。。。。。。。。。。。。。。。。。。。。。
+——————————————————————————————————————————————————————————————————————————————————————————————
+位置：device/rda/driver/camera/inc/sp0a19_f_config.h   前置摄像头
+struct sensor_dev sp0a19_dev = {
+	.info	= &sp0a19_info,		//定义camera信息
+	.ops	= &sp0a19_ops,		//定义camera函数接口
+};
+
+同上
+
+——————————————————————————————————————————————————————————————————————————————————————————
+位置：kernel/drivers/media/platform/rda/
+
+摄像头整体流程   v4l2协议
+位置：kernel/drivers/media/v4l2-core
+--------------------------------------------------
+
+camera 闪光配置
+/device/rda/etau/nollexa9v2v8810p/camera.cfg
+device_id = 1   表示前置
+device_id = 0   表示后置
+/device/rda/etau/nollexa9v2v8810p/include/tgt_ap_board_config.h
+宏定义了  灯在原理图中的管脚
+
+设备程序 驱动程序路径    注意名字要匹配
+/kernel/arch/arm/mach-rda8810/devices.c
+/kernel/drivers/media/video/rda/rda_sensor.c
+
+
+

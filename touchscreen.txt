@@ -1,0 +1,81 @@
+tp型号：msg2133
+		tp调试
+代码：a6b-5271
+位置：device/rda/driver/touchscreen/rda_ts_msg2133.c   
+      device/rda/driver/touchscreen/rda_ts.h
+struct rda_ts_panel_array{
+	struct rda_ts_panel_info	*panel_info;
+	struct rda_ts_panel_array    *next;
+};
+struct rda_ts_panel_info{
+	struct rda_ts_ops ops;		指针函数的封装
+	struct rda_ts_para ts_para;	信息的封装
+};
+struct rda_ts_para{
+	char name[16];		//名字
+	u16 i2c_addr;		//i2c地址
+	u16 x_max;		//tp  x
+	u16 y_max;			y
+	u16 gpio_irq;		//中断
+	u16 vir_key_num;	
+	int irqTriggerMode;
+	struct rda_ts_vir_key vir_key[MAX_VIRTUAL_KEY_NUM];
+};
+struct rda_ts_vir_key{
+	u16 key_value;		key值
+	u16 key_x;		
+	u16 key_y;
+	u16 key_x_width;
+	u16 key_y_width;
+};
+
+/kernel/drivers/input/touchscreen
+
+
+
+电容屏工作原理：
+	触摸屏的工作原理概括来说就是上报坐标值，X轴、Y轴的值。它是通过ADC来检测计算X、Y轴坐标值。
+当手指点击屏幕，会从接触点吸收小量电流，造成角落电极的压降，利用感应人体微弱电流的方式来达到触控的目的。
+当被触摸时，解析触点位置坐标，同过芯片去计算处理。
+触摸屏基本配置：IIC 上电  INT
+主要需要看的 ： 上电  复位信号  I2C信号 中断信号	睡眠，唤醒  取点
+主干框架程序：	/device/rda/touchscreen/rda_ts_base.c
+		rda_ts_init	-- 	rda_ts_ft6x06.c
+					rda_ft6x06_get_pos  取点
+
+
+		probe
+		customer.mk  		平台配置  定制   添加屏和芯片信息
+
+	i2c_tranfer 传输信息
+
+I2C 地址设置
+struct i2c_msg {
+	__u16 addr;	/* slave address			*/
+	__u16 flags;
+#define I2C_M_TEN		0x0010	/* this is a ten bit chip address */  芯片地址
+#define I2C_M_RD		0x0001	/* read data, from slave to master */ 读数据 从到主
+#define I2C_M_STOP		0x8000	/* if I2C_FUNC_PROTOCOL_MANGLING */
+#define I2C_M_NOSTART		0x4000	/* if I2C_FUNC_NOSTART */
+#define I2C_M_REV_DIR_ADDR	0x2000	/* if I2C_FUNC_PROTOCOL_MANGLING */
+#define I2C_M_IGNORE_NAK	0x1000	/* if I2C_FUNC_PROTOCOL_MANGLING */
+#define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+#define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+	__u16 len;		/* msg length				*/
+	__u8 *buf;		/* pointer to msg data			*/
+};
+
+
+------------------------------------------------------------------------------------------------
+主干 ：/device/rda/touchscreen/rda_ts_base.c
+	调试MSG2133
+	查看msg2133module	
+	这测msg2133_info
+struct rda_ts_panel_info msg2133_info = {    用到的函数封装
+	/* struct rda_lcd_ops ops; */
+	.ops = { msg2133 相关函数 }
+		rda_msg2133_init_gpio  -- gpio_request 为tp复位和中断申请管脚和取名
+	#define _TGT_AP_GPIO_TOUCH_RESET        GPIO_A7		
+	#define _TGT_AP_GPIO_TOUCH_IRQ          GPIO_A1
+		rda_msg2133_get_pos	-- 设置i2c的一些地址信息 距离数据校验 位置校验 触摸屏取点
+

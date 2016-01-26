@@ -1,0 +1,18 @@
+11月11号
+	读7796屏代码，kernel/drivers/video/rda/ rda_panel_st7796_mcu.c 
+宏
+	实时平台时间 
+	#define ST7796_MCU_TIMING {}	
+		->.lcd_timing = ST7796_MCU_TIMING	->struct gouda_lcd lcd;	
+		->union gouda_lcd_timing lcd_timing     -> struct{us32 tas:3;u32:1;}mcu;
+tas设置本地时间的时钟数	tah本地时间  pwl在时钟数上控制脉冲宽度低 pwh在时钟数上控制脉冲宽度的高
+结构体中成员后加：。 位域是指信息在存储时，并不需要咱用一个完整的字节，而只需要占几个或一个二进制位。struct 位域结构体名{位域列表}；位域的列表的形式位：类型说明符 位域名：位域长度。其中位域tas占3位，u32为int占1位。空域 struct{int a:4;int b:0}; 空域所占大小和a的类型及空域的类型二者都有关。位域可以无域名，这时它只是用来填充和调整位置。无名的位域不能使用。位域的长度不能超过类型的长度。
+		
+	.tas	->#define tas(ptr) (xchg((ptr),1))	
+		->#define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))	->static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
+将第二个参数x放入寄存器中与第一个指针参数所指的内容交换，返回所指内容原先的值。谈不上两数交换值。但是它可以“原子”的设置ptr所指内容并取出原值。
+	设置lcd
+	#define ST7796_MCU_CONFIG { } 
+	.cs 片选	.output_fmt 使用16位的数据来表示一个像素的颜色，数据格式分5:6:5(高5位表示红色，中间6位表示绿色，最低5位表示蓝色
+
+

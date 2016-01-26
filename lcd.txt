@@ -1,0 +1,41 @@
+显示屏芯片 st7796
+		lcd 调试
+位置：kernel/drivers/video/rda/rda_panel_st7796.c
+#define ST7796_MCU_TIMING {						     
+	{.tas       =  7,                                            
+		.tah        =  7,                                    
+		.pwl        =  25,                                   
+		.pwh        =  25}}            
+tas设置本地时间的时钟数	tah本地时间  pwl在时钟数上控制脉冲宽度低 pwh在时钟数上控制脉冲宽度的高
+时序   重要的参数
+
+架构： ST7796_mcu_init_gpio   //初始化ST7796_mcu_info, &rda_fb_panel_ST7796_mcu_driver
+	ST7796_mcu_info----》struct rda_lcd_info //初始化ops 和GOUDU模块（色彩转换 背景 图形处理）
+		gpio_request(GPIO_LCD_RESET, "lcd reset") 申请管脚和取名
+	通过static struct rda_lcd_info ST7796_mcu_info = {
+	.ops = {
+		.s_init_gpio = ST7796_mcu_init_gpio,
+		.s_open = ST7796_mcu_open,
+		.s_readid = ST7796_mcu_readid,
+		.s_active_win = ST7796_mcu_set_active_win,
+		.s_rotation = ST7796_mcu_set_rotation,
+		.s_sleep = ST7796_mcu_sleep,
+		.s_wakeup = ST7796_mcu_wakeup,
+		.s_close = ST7796_mcu_close,
+		.s_read_fb = ST7796_mcu_read_fb,
+		.s_rda_lcd_dbg_w = ST7796_rda_lcd_dbg_w},
+	.lcd = {
+		.width = ST7796_MCU_LCDD_DISP_X,
+		.height = ST7796_MCU_LCDD_DISP_Y,
+		.lcd_interface = GOUDA_LCD_IF_DBI,
+		.lcd_timing = ST7796_MCU_TIMING,
+		.lcd_cfg = ST7796_MCU_CONFIG},
+	.name = ST7796_MCU_PANEL_NAME,
+};	 
+主要修改的内容  显示屏的一些控制函数
+	ST7796_mcu_init_gpio	申请管脚和取名 上电
+	ST7796_mcu_open		控制指令和数据
+	ST7796_mcu_readid	读ID 确定那个屏
+	ST7796_mcu_sleep	屏睡眠
+	ST7796_mcu_wakeup	屏的唤醒
+
